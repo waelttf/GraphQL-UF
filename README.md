@@ -15,7 +15,7 @@ GraphQL UF is a Burp Suite extension designed to help penetration testers and se
 * Clean and intuitive Swing-based GUI tab inside Burp Suite.
 
 **Installation**
-* Download the latest release .jar file from the Releases.
+* Download the latest release .py file from the Releases.
 * Open Burp Suite.
 * Go to the Extensions tab.
 * Click Add.
