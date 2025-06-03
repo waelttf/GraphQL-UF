@@ -107,25 +107,38 @@ class BurpExtender(IBurpExtender, ITab, IMessageEditorController):
 
         for idx, item in enumerate(http_items, 1):
             request_info = self._helpers.analyzeRequest(item)
-            url = request_info.getUrl().toString()
+            url_obj = request_info.getUrl()
+            path = url_obj.getPath()
+            url = url_obj.toString()
 
-            if "/graphql" in url.lower() or any("graphql" in h.lower() for h in request_info.getHeaders()):
-                body = self._helpers.bytesToString(item.getRequest()[request_info.getBodyOffset():])
+            # Match any URL containing "graphql" in its path (case-insensitive)
+            if "graphql" in path.lower():
+                body_offset = request_info.getBodyOffset()
+                body_bytes = item.getRequest()[body_offset:]
+                body_str = self._helpers.bytesToString(body_bytes)
+
                 try:
-                    json_body = json.loads(body)
-                    query = json_body.get("query", "")
+                    json_body = json.loads(body_str)
+                    # Accept 'query' or 'queryHash' as identifying keys
+                    query = json_body.get("query")
+                    query_hash = json_body.get("queryHash")
                     op_name = json_body.get("operationName", "Unnamed")
 
                     if query:
                         key = hashlib.sha256(query.encode()).hexdigest()
-                        if key not in seen_hashes:
-                            seen_hashes.add(key)
-                            self.graphql_requests.append((item, {
-                                "id": len(self.graphql_requests) + 1,
-                                "method": request_info.getMethod(),
-                                "url": url,
-                                "operation": op_name
-                            }))
+                    elif query_hash:
+                        key = query_hash
+                    else:
+                        continue  # Skip if neither key present
+
+                    if key not in seen_hashes:
+                        seen_hashes.add(key)
+                        self.graphql_requests.append((item, {
+                            "id": len(self.graphql_requests) + 1,
+                            "method": request_info.getMethod(),
+                            "url": url,
+                            "operation": op_name
+                        }))
                 except:
                     continue
 
@@ -137,8 +150,7 @@ class BurpExtender(IBurpExtender, ITab, IMessageEditorController):
                 meta["operation"]
             ])
 
-        sortKeys = [TableRowSorter.SortKey(0, SortOrder.ASCENDING)]
-        self._sorter.setSortKeys(sortKeys)
+        self._sorter.setSortKeys([TableRowSorter.SortKey(0, SortOrder.ASCENDING)])
 
     def _on_row_select(self, event):
         row = self._table.getSelectedRow()
